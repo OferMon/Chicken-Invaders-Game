@@ -1,0 +1,245 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Chicken Invaders</title>
+    <script src="jquery.3.4.1.min.js"></script>
+    <style>
+
+        body {
+            background-color: black;
+            text-align: center;
+        }
+
+        .headline {
+            font-size: 50px;
+            letter-spacing: 2px;
+            color: dimgrey;
+            font-family: "Comic Sans MS", cursive, sans-serif;
+        }
+
+        #container {
+            border: 1px solid dimgrey;
+            background-image: url('img/background.png');
+            width: 800px;
+            height: 600px;
+            margin: auto;
+            position: relative;
+            margin-top: 15px;
+        }
+
+        #spacecraft {
+            width: 40px;
+            height: 40px;
+            bottom: 5px;
+            position: absolute;
+            left: 380px;
+            border-radius: 20%;
+        }
+
+        .shot {
+            width: 10px;
+            height: 20px;
+            position: absolute;
+            bottom: 45px;
+        }
+
+        .enemy {
+            width: 48px;
+            height: 40px;
+            top: 0px;
+            position: absolute;
+        }
+
+        th {
+            text-align: center;
+            width: 40px;
+            color: grey;
+        }
+
+        table {
+            border: 1px solid dimgrey;
+            width: 802px;
+        }
+
+    </style>
+
+    <script>
+        shotEnable = true;
+        gamePaused = false;
+        enamyNumber = 0;
+        hitNumber = 0;
+        missNumber = 0;
+        controllers = { leftPressed: false, rightPressed: false, shotPressed: false }
+
+        $(document).ready(function () {
+            window.addEventListener("keydown", keyDown);
+            window.addEventListener("keyup", keyUp);
+
+            setInterval(playerAction, 3);
+            createEnemy();
+        })
+
+        function keyDown(key) {
+            if (key.keyCode == 37) {
+                controllers.leftPressed = true;     //left
+            } else if (key.keyCode == 39) {
+                controllers.rightPressed = true;    //right
+            } else if (key.keyCode == 38) {
+                controllers.shotPressed = true;     //shot
+            }
+        }
+
+        function keyUp(key) {
+            if (key.keyCode == 37) {
+                controllers.leftPressed = false;    //left
+            } else if (key.keyCode == 39) {
+                controllers.rightPressed = false;   //right
+            } else if (key.keyCode == 38) {
+                controllers.shotPressed = false;    //shot
+            }
+        }
+
+        function playerAction() {
+            if (gamePaused)
+                return;
+
+            let currentLeftLocation = parseFloat($("#spacecraft").css("left"));
+
+            if (controllers.leftPressed) {       //left
+                let x = Math.max(0, currentLeftLocation - 1);
+                $("#spacecraft").css("left", x + "px")
+            }
+            if (controllers.rightPressed) {      //right
+                let x = Math.min(760, currentLeftLocation + 1);
+                $("#spacecraft").css("left", x + "px")
+            }
+            if (controllers.shotPressed) {       //shot
+                createShot();
+            }
+        }
+
+        function createEnemy() {
+            if (gamePaused)
+                return;
+
+            enamyNumber++;
+            updateStatus();
+
+            let $enemy = $("<img>").attr({ "class": "enemy", "src": "img/chicken.png" });
+            let $location = Math.floor((Math.random() * 752));
+            $enemy.css("left", $location + "px"); 
+            let $enemiesSpeed = Math.floor((Math.random() * 3500) + 2500);   //sum = 6000
+            $enemy.animate({ top: "560px" }, { progress: function () { compareForkill($enemy) }, complete:notHit, duration:$enemiesSpeed, easing:"linear" })
+            $("#container").append($enemy);
+
+            if (enamyNumber == 100) {
+                setTimeout(stopGame, 6000);     //max enemiesSpeed = 6000
+            }
+            else {
+                let $timeBetweenEnemies = Math.floor((Math.random() * 1000) + 500);
+                setTimeout(createEnemy, $timeBetweenEnemies);
+            }       
+        }
+
+        function compareForkill($enemy) {
+            if (gamePaused)
+                return;
+
+            enemyY = parseFloat($enemy.css("bottom"));
+            enemyX = parseFloat($enemy.css("left"));
+            $spacecraft = $("#spacecraft");
+            spacecraftY = parseFloat($spacecraft.css("bottom"));
+            spacecraftX = parseFloat($spacecraft.css("left"));
+
+            if ((enemyY - spacecraftY <= 27) && (enemyX - spacecraftX <= 27) && (enemyX - spacecraftX >= -32)) {    // ( 40/1.5 , 40/1.5 , -48/1.5 )
+                gamePaused = true;
+                $spacecraft.css("background-color", "red");
+                setTimeout(stopGame, 3);
+            }
+        }
+
+        function stopGame() {
+            $("#container").empty();
+            alert("game over - press to start again");
+            location.reload();
+        }
+
+        function createShot() {
+            if (shotEnable == false)
+                return;
+            shotEnable = false;
+
+            audio = new Audio("sound/laser.ogg");
+            audio.play();
+
+            let $shot = $("<img>").attr({ "class": "shot", "src": "img/laser.png"});
+            $shot.css("left", (parseFloat($("#spacecraft").css("left")) + 15) + "px");  //Shooting position relative to the spacecraft
+            $("#container").append($shot);
+
+            $shot.animate({ bottom: "580px" }, { progress: function () { compareForHit($shot) }, complete: function () { $shot.remove(); }, duration: 1000, easing: "linear" })
+            setTimeout(function () { shotEnable = true }, 300);  //Time interval between shots
+        }
+
+        function compareForHit($shot) {
+            shotY = parseFloat($shot.css("bottom"));
+            shotX = parseFloat($shot.css("left"));
+
+            $(".enemy").each(function () {
+                enemyY = parseFloat($(this).css("bottom"));
+                enemyX = parseFloat($(this).css("left"));
+
+                if ((enemyY - shotY < 10) && (shotX - enemyX <= 48) && (shotX - enemyX >= -10)) {
+                    hitNumber++;
+                    updateStatus();
+
+                    $(this).stop();
+                    $shot.stop();
+
+                    $(this).remove();
+                    $shot.remove();
+                    return;
+                }
+            })
+        }
+        
+        function updateStatus() {
+            $("#totalEnemyShips").text(enamyNumber);
+            $("#hits").text(hitNumber + "/" + enamyNumber);
+            $("#misses").text(missNumber + "/" + enamyNumber);
+        }
+
+        function notHit() {
+            missNumber++;
+            updateStatus();
+            $(this).remove();
+        }
+
+    </script>
+
+</head>
+<body>
+
+    <span class="headline">Chicken Invaders</span>
+    <br />
+    <span class="headline">web edition</span>
+    <div id="container">
+        <img id="spacecraft" src="img\player.png" />
+    </div>
+
+    <table align="center">
+        <tr>
+            <th>Total enemy ships</th>
+            <th>Hits</th>
+            <th>Misses</th>
+
+        </tr>
+        <tr>
+            <th id="totalEnemyShips">0</th>
+            <th id="hits">0/0</th>
+            <th id="misses">0/0</th>
+        </tr>
+    </table>
+
+</body>
+</html>
